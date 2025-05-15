@@ -11,16 +11,17 @@ end
 
 % Control parameters
 mu = 0.2; % Weight for penalty term
-nu = 8;
-gam = -1;
-
+nu = 1.5;
 lambda = 1;
-delta_t = 1.5;
+gam = 1;
+
+delta_t = 1;
 sigma = 3;
 epsilon = 1.5; % smoothing For dirac delta and heaviside
 alpha = 1;
 beta = 0.8;
-no_iter = 1500;
+no_iter = 50;
+out_every = 1;
 
 % Continuous Dirac Delta
 % syms DiracDeltasym(x)
@@ -52,9 +53,13 @@ end
 % fplot(@(x) Heaviside(x,epsilon));
 % title("Heaviside");
 
-I = rgb2gray(imread("drlse_knee.jpg"));
+% I = rgb2gray(imread("drlse_knee.jpg"));
+I = imread("coins.png");
 I = double(I)/255; % Normalize Image
 % I2 = imread("coins.png");
+% writematrix(I2,"coins.csv");
+
+
 % coins_size = size(I2)
 % I = zeros([420,420]);
 % I(200:300,200:300) = 1;
@@ -155,31 +160,57 @@ for iter = 1:no_iter
     grad_phi = sqrt(phi_x.^2 + phi_y.^2 + 1e-10);
 
     L = zeros(size(I)); % L(phi_{i,j}^n)
+    Delta_phi = DiracDelta(phi,epsilon);
+    H_phi = Heaviside(phi,epsilon);
 
-
-    %Penalty term calculation i.e mu*div(d_R|grad phi| . grad phi)
+    %% Penalty term calculation i.e mu*div(d_R|grad phi| . grad phi)
     dr_coeff = dr(grad_phi);
     pen_x = dr_coeff.*phi_x;
     pen_y = dr_coeff.*phi_y;
     pen_term = div(pen_x,pen_y);
     pen_terms(iter) = mean(pen_term,"all");
-    L = L + mu .*div(pen_x,pen_y);
+    L = L + mu .*pen_term;
 
-    % Line term
+    %% Line term
     coeff = edgeStop ./(grad_phi); 
     line_x = coeff .* phi_x;
     line_y = coeff .* phi_y;
-    line_term =  DiracDelta(phi,epsilon).*div(line_x, line_y ); 
+    line_term =  Delta_phi.*div(line_x, line_y ); 
     line_terms(iter) = mean(line_term,"all");
-    L = L + nu* DiracDelta(phi,epsilon).*div(line_x, line_y ) ;
+    L = L + nu* line_term ;
 
-    % Area term 
-    area_term = edgeStop.*DiracDelta(phi,epsilon);
-    area_terms(iter) = mean(area_term,"all");
-    L = L + gam*edgeStop.*DiracDelta(phi,epsilon);
+    %% Area term 
+    % area_term = edgeStop.*DiracDelta(phi,epsilon);
+    % area_terms(iter) = mean(area_term,"all");
+    % L = L + gam*edgeStop.*DiracDelta(phi,epsilon);
+
+    %% fitting term 
+    KIH_1 = imfilter(I.* H_phi,gauss_filter,'replicate');
+    KH_1 = imfilter(H_phi,gauss_filter,'replicate');
+    f1 = KIH_1 ./ KH_1;
+
+    KIH_2 = imfilter(I.*(1 - H_phi),gauss_filter,'replicate');
+    KH_2 = imfilter(1 - H_phi,gauss_filter,'replicate');
+    f2 = KIH_2 ./ KH_2;
+
+    fitting_term = (I - f2).^2 - (I - f1).^2;
+    L = L + lambda*Delta_phi .*fitting_term;
+
+    %% fractional fitting term 
+    FI = I + I_frac; 
+    
+    KFIH_1 = imfilter(FI.*H_phi,gauss_filter,'replicate');
+    b1 = KFIH_1 ./ KH_1;
+
+    KFIH_2 = imfilter(FI.*H_phi,gauss_filter,'replicate');
+    b2 = KFIH_2 ./ KH_2;
+
+    frac_fit_term = (I - b2).^2 - (I - b1).^2;
+    L = L + gam*Delta_phi.*frac_fit_term;
+    %% Updation
 
     phi = phi + delta_t*L;
-    if mod(iter, 20) == 0
+    if mod(iter, out_every) == 0
         imshow(I, []); hold on;
         contour(phi, [0 0], 'r', 'LineWidth', 1);
         title(['Iteration ', num2str(iter)]);

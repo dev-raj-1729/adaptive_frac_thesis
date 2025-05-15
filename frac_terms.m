@@ -7,6 +7,10 @@ function term = frac_term(order,h)
     term = (-1).^h.*gamma(order + 1)./(gamma(h+1) .*gamma(order - h +1));
 end
 
+terms = frac_term(1.125,0:170);
+zero_terms = sum(terms == 0,"all")
+writematrix(terms,"terms.csv");
+
 % fsurf(@(x,y) log10(abs(frac_term(x,y))),[1 2 0 20]);
 % xlabel("order");
 % ylabel("term");
