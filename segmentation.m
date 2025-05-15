@@ -15,13 +15,13 @@ nu = 1.5;
 lambda = 1;
 gam = 1;
 
-delta_t = 1;
+delta_t = 5;
 sigma = 3;
 epsilon = 1.5; % smoothing For dirac delta and heaviside
 alpha = 1;
 beta = 0.8;
-no_iter = 50;
-out_every = 1;
+no_iter = 100;
+out_every = 1; % no iteration after which plot is updated
 
 % Continuous Dirac Delta
 % syms DiracDeltasym(x)
@@ -39,11 +39,6 @@ end
 
 
 % Continuous Heaviside Function
-% syms Heaviside(x) 
-% Heaviside(x) = piecewise( ...
-%     abs(x) < epsilon, 1/2 * (1 + x/epsilon + (1/pi)*sin(pi*x/epsilon)), ...
-%     x > epsilon, 1, ... 
-%     x < -epsilon, 0);
 function out = Heaviside(x,epsilon)
     out = (abs(x) < epsilon) .* (0.5*(1 + x/epsilon + (1/pi)*sin(pi*x/epsilon))) +...
         (x > epsilon);
@@ -78,11 +73,11 @@ I = conv2(I,gauss_filter,"same");
 figure(nfc());
 imshow(grad_I);
 title("Absolute Gradient");
-writematrix(grad_I,"gradient.csv");
+writematrix(grad_I,"./matrices/gradient.csv");
 
 % Calculate Order Matrix 
 P = (255*grad_I + alpha)./ (255*grad_I + beta);
-writematrix(P,"order_matrix.csv");
+writematrix(P,"./matrices/order_matrix.csv");
 
 % Calculate Fractional Derivative
 % tic
@@ -97,7 +92,7 @@ writematrix(P,"order_matrix.csv");
 tic
 I_frac = FracDerConv(I,P);
 toc
-writematrix(I_frac,"conv_frac.csv");
+writematrix(I_frac,"./matrices/conv_frac.csv");
 figure(nfc());
 imshow(I_frac);
 title("Convolution Fractional Derivative");
@@ -118,7 +113,8 @@ title("Convolution Fractional Derivative");
 %============================================
 % Calculate edge stop function 
 I_frac_smooth = conv2(I_frac,gauss_filter,"same");
-edgeStop = 1./(1 + 255*I_frac_smooth);
+% edgeStop = 1./(1 + I_frac_smooth);
+edgeStop = 1./(1 + 127*I_frac_smooth);
 figure(nfc());
 imshow(edgeStop);
 title("Edge Stop Function");
@@ -143,7 +139,7 @@ end
 % ========
 % Initialize Level Set
 phi =  2*ones(size(I));
-phi(150:170,200:220) = -1;
+phi(140:210,200:270) = -2;
 figure(nfc());
 imshow(I,[]);hold on;
 contour(phi, [0 0], 'r', 'LineWidth', 1);
@@ -154,6 +150,8 @@ figure(nfc());
 line_terms = zeros([1,no_iter]);
 area_terms = zeros([1,no_iter]);
 pen_terms = zeros([1,no_iter]);
+fit_terms = zeros([1,no_iter]);
+frac_fit_terms = zeros([1,no_iter]);
 tic
 for iter = 1:no_iter
     [phi_x,phi_y] = gradient(phi);
@@ -186,15 +184,16 @@ for iter = 1:no_iter
 
     %% fitting term 
     KIH_1 = imfilter(I.* H_phi,gauss_filter,'replicate');
-    KH_1 = imfilter(H_phi,gauss_filter,'replicate');
+    KH_1 = imfilter(H_phi,gauss_filter,'replicate') + 1e-10;
     f1 = KIH_1 ./ KH_1;
 
     KIH_2 = imfilter(I.*(1 - H_phi),gauss_filter,'replicate');
-    KH_2 = imfilter(1 - H_phi,gauss_filter,'replicate');
+    KH_2 = imfilter(1 - H_phi,gauss_filter,'replicate') + 1e-10;
     f2 = KIH_2 ./ KH_2;
 
-    fitting_term = (I - f2).^2 - (I - f1).^2;
-    L = L + lambda*Delta_phi .*fitting_term;
+    fitting_term = Delta_phi.*((I - f2).^2 - (I - f1).^2);
+    fit_terms(iter) = mean(fitting_term,"all");
+    L = L + lambda*fitting_term;
 
     %% fractional fitting term 
     FI = I + I_frac; 
@@ -205,8 +204,9 @@ for iter = 1:no_iter
     KFIH_2 = imfilter(FI.*H_phi,gauss_filter,'replicate');
     b2 = KFIH_2 ./ KH_2;
 
-    frac_fit_term = (I - b2).^2 - (I - b1).^2;
-    L = L + gam*Delta_phi.*frac_fit_term;
+    frac_fit_term = Delta_phi.*((I - b2).^2 - (I - b1).^2);
+    frac_fit_term(iter) = mean(frac_fit_term,"all");
+    L = L + gam*frac_fit_term;
     %% Updation
 
     phi = phi + delta_t*L;
@@ -223,7 +223,7 @@ figure(nfc());
 imshow((phi<0).*I);
 % surf(phi);
 title("segmentation");
-writematrix(phi,"phi.csv");
+writematrix(phi,"./matrices/phi.csv");
 
 figure(nfc());
 % surf(-phi);
@@ -231,16 +231,23 @@ imshow(I,[]);hold on;
 contour(phi, [0 0], 'r', 'LineWidth', 1);
 title("final level set");
 
-writematrix(line_terms,"line_terms.csv");
-writematrix(area_terms,"area_terms.csv");
+writematrix(line_terms,"./matrices/line_terms.csv");
+writematrix(area_terms,"./matrices/area_terms.csv");
 
 figure(nfc())
 plot(line_terms);
 title("Line terms");
 
+% figure(nfc());
+% plot(area_terms);
+% title("area terms");
 figure(nfc());
-plot(area_terms);
-title("area terms");
+plot(fit_terms);
+title("fitting terms");
+
+figure(nfc());
+plot(frac_fit_terms);
+title("fractional fiting terms");
 
 figure(nfc());
 plot(pen_terms);
