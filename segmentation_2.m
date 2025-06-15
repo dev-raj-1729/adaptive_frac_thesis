@@ -137,6 +137,7 @@ for iter = 1:no_iter
 end
 toc
 
+imwrite(phi <0,"./Outputs/or_seg2_mask.png");
 
 figure();
 imshow(I,[]);hold on;

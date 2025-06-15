@@ -167,7 +167,7 @@ title("final level set");
 
 % writematrix(line_terms,"./matrices/line_terms.csv");
 % writematrix(area_terms,"./matrices/area_terms.csv");
-
+imwrite(phi <0,"./Outputs/or_seg1_mask.png");
 figure(nfc())
 plot(line_terms);
 title("Line terms");

@@ -1,12 +1,16 @@
 close all;
 % I = rgb2gray(imread('./inputs/drlse_knee.jpg'));
 I = imread('./inputs/oval_and_rectangle.png');
-I = double(I)/255;
-I = imnoise(I,"gaussian",0,0.01);
-imshow(I);
-h = iso_frac_filter(0.2,51);
-I_frac = rescale((imfilter(I,h,'replicate')));
+% I = double(I)/255;
+% I = imnoise(I,"gaussian",0,0.01);
+imshow(I == 153);
+imwrite(I ~= 153,"./inputs/oval_and_rectangle_true_mask.png");
+% h = iso_frac_filter(0.2,51);
+% I_frac = rescale((imfilter(I,h,'replicate')));
 % I_frac = imfilter(I,h);
 % I_frac = rescale(calc_order(I,15));
 figure();
 imshow(I_frac);
+
+figure();
+imhist(uint8(I*255));
